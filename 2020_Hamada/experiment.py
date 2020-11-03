@@ -85,12 +85,12 @@ class App(tkinter.Frame):
     def draw_buttons(self):
         self.button_0 = tkinter.Button(text="set", width=4, command=self.button_0)
         self.button_0.place(x=150, y=0)
-        button_1 = tkinter.Button(text="グラフを表示する", width=12, command=self.button_1)
-        button_1.place(x=350, y=110)
-        button_2 = tkinter.Button(text="グラフを初期化", width=12, command=self.button_2)
-        button_2.place(x=450, y=110)
-        button_3 = tkinter.Button(text="次の条件へ", width=12, command=self.button_3)
-        button_3.place(x=350, y=140)
+        self.button_1 = tkinter.Button(text="グラフを表示する", width=12, command=self.button_1, state=tkinter.DISABLED)
+        self.button_1.place(x=350, y=110)
+        self.button_2 = tkinter.Button(text="グラフを初期化", width=12, command=self.button_2, state=tkinter.DISABLED)
+        self.button_2.place(x=450, y=110)
+        self.button_3 = tkinter.Button(text="次の条件へ", width=12, command=self.button_3, state=tkinter.DISABLED)
+        self.button_3.place(x=350, y=140)
         self.button_4 = tkinter.Button(text="保存して終了", width=14, command=self.button_4, state=tkinter.DISABLED)
         self.button_4.place(x=200, y=200)
 
@@ -111,6 +111,9 @@ class App(tkinter.Frame):
         self.n_condition = 0
         self.condition.set("%s条件目（%s）" %(self.n_condition, self.conditions[self.n_condition]))
         self.button_0["state"] = tkinter.DISABLED
+        self.button_1["state"] = tkinter.NORMAL
+        self.button_2["state"] = tkinter.NORMAL
+        self.button_3["state"] = tkinter.NORMAL
 
     def button_1(self):
         score_now = int(self.entry_2_1.get())
@@ -144,6 +147,7 @@ class App(tkinter.Frame):
         outf = "rslts/%s.json" %self.results["subject-ID"].zfill(3)
         with open(outf, "w") as fd:
             json.dump(self.results, fd, indent=2)
+        self.graph.graph_init()
 
     def button_4(self):
         makedirs("rslts", exist_ok=True)
@@ -159,8 +163,8 @@ class Graph(tkinter.Frame):
         self.root = root
         self.pack()
         self.root.title("Graph")
-        self.root.geometry("400x500")
-        self.canvas = tkinter.Canvas(self.root, width=400, height=500)
+        self.root.geometry("500x600")
+        self.canvas = tkinter.Canvas(self.root, width=500, height=600)
 
     def graph_init(self):
         self.canvas.delete("all")
@@ -177,17 +181,29 @@ class Graph(tkinter.Frame):
             if condition.find("a1")>=0:
                 pass
             elif condition.find("a2")>=0:
-                score_other = 0
+                score_other = -1
             if condition.find("b1")>=0:
                 pass
             elif condition.find("b2")>=0:
-                score_old = 0
+                score_old = -1
         
         # create_rectangle(x1, y1, x2, y2)
-        self.canvas.create_rectangle(10, 0, 100, 400, fill="red")
-        self.canvas.create_rectangle(110, 10, 200, 400, fill="green")
-        self.canvas.create_rectangle(210, 20, 300, 500, fill="blue")
-        self.canvas.pack()
+        if score_now>=0:
+            top_1 = 100
+            self.canvas.create_rectangle(0, top_1, 100, 500, fill="red")
+            self.canvas.create_text(50, 550, text="あなたの\n今回の成績", font=("Helvetica", 12, "bold"))
+            self.canvas.create_text(50, top_1-10, text=str(500), font=("Helvetica", 12, "bold"))
+        if score_old>=0:
+            top_2 = 110
+            self.canvas.create_rectangle(150, top_2, 250, 500, fill="green")
+            self.canvas.create_text(200, 550, text="あなたの\n過去の成績", font=("Helvetica", 12, "bold"))
+            self.canvas.create_text(200, top_2-10, text=str(490), font=("Helvetica", 12, "bold"))        
+        if score_other>=0:
+            top_3 = 120
+            self.canvas.create_rectangle(300, top_3, 400, 500, fill="blue")
+            self.canvas.create_text(350, 550, text="他の人の\n今回の成績", font=("Helvetica", 12, "bold"))
+            self.canvas.create_text(350, top_3-10, text=str(480), font=("Helvetica", 12, "bold"))        
+            self.canvas.pack()
 
 
 def main():
