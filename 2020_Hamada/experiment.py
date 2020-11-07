@@ -1,27 +1,45 @@
 # coding: utf-8
 
+import random
 import json
 import datetime
 import tkinter
+from tkinter import messagebox
 from os import makedirs
+from os.path import splitext, isfile
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import argparse
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--outd", default="rslts")
+    parser.add_argument("--tmpd", default="tmp")
+    parser.add_argument("--id2conditions", default="./id2conditions.json")
+    parser.add_argument("--experimenter_height", type=int, default=250)
+    parser.add_argument("--experimenter_width", type=int, default=600)
+    parser.add_argument("--graph_height", type=int, default=600)
+    parser.add_argument("--graph_width", type=int, default=500)
+    parser.add_argument("--graph_color_now", default="red")
+    parser.add_argument("--graph_color_old", default="green")
+    parser.add_argument("--graph_color_other", default="blue")
+    parser.add_argument("--other_score_range", type=float, nargs=2, default=[0.75, 0.85])
+    parser.add_argument("--seed", type=int, default=123)
+    return parser.parse_args()
+
 
 class App(tkinter.Frame):
-    def __init__(self, root):
+    def __init__(self, root, args):
         # super(App, self).__init__()
         super().__init__(root)
         self.pack()
-        with open("id2conditions.json") as fd:
+        with open(args.id2conditions) as fd:
             self.id2conditions = json.load(fd)
+        self.args = args
 
         self.results = {"subject-ID": None, "date": str(datetime.datetime.now()), "practice": [], "a1b1": [], "a1b2": [], "a2b1": [], "a2b2": []}
 
         self.root = root
         self.root.title("For Experimenter")
-        self.root.geometry("600x250")
+        self.root.geometry("%dx%d" %(args.experimenter_width, args.experimenter_height))
 
         # 被験者IDの管理
         label_ID = tkinter.Label(text="被験者ID")
@@ -38,7 +56,7 @@ class App(tkinter.Frame):
         label_condtion.place(x=200, y=0)
 
         self.newWindow = tkinter.Toplevel(self.root)
-        self.graph = Graph(self.newWindow)
+        self.graph = Graph(self.newWindow, args)
 
         self.main()
         self.draw_buttons()
@@ -91,15 +109,19 @@ class App(tkinter.Frame):
         self.button_2.place(x=450, y=110)
         self.button_3 = tkinter.Button(text="次の条件へ", width=12, command=self.button_3, state=tkinter.DISABLED)
         self.button_3.place(x=350, y=140)
-        self.button_4 = tkinter.Button(text="保存して終了", width=14, command=self.button_4, state=tkinter.DISABLED)
-        self.button_4.place(x=200, y=200)
+        self.button_4 = tkinter.Button(text="Graphを再配置", width=12, command=self.button_4)
+        self.button_4.place(x=450, y=140)
+        self.button_5 = tkinter.Button(text="保存して終了", width=14, command=self.button_5, state=tkinter.DISABLED)
+        self.button_5.place(x=200, y=200)
 
     def button_0(self):
         ID = int(self.entry_ID.get())
         if 1<=ID<=24:
             pass
+        elif ID==0:
+            messagebox.showinfo("Information", "プレ実験を開始します")
         elif ID<1:
-            tkinter.messagebox.showerror("Warning", "被験者IDは1以上の整数値である必要があります")
+            messagebox.showerror("Error", "被験者IDは0以上の整数値である必要があります\nただし0はプレ実験用のダミーIDです")
             return 0
         else:
             ID = ID % 24
@@ -129,6 +151,11 @@ class App(tkinter.Frame):
             self.entry_2_1.get(), self.entry_2_2.get(), self.entry_2_3.get(), \
             self.entry_3_1.get(), self.entry_3_2.get(), self.entry_3_3.get(), \
         ]
+        try:
+            self.results[self.conditions[self.n_condition]] = list(map(int, self.results[self.conditions[self.n_condition]]))
+        except ValueError:
+            messagebox.showwarning("Warning", "全てのスコアが入力されていません．\n全てのスコアを入力してもう一度ボタンを押してください．")
+            return 1
         self.entry_1_1.delete(0, tkinter.END)
         self.entry_1_2.delete(0, tkinter.END)
         self.entry_1_3.delete(0, tkinter.END)
@@ -143,28 +170,46 @@ class App(tkinter.Frame):
             self.condition.set("%s条件目（%s）" %(self.n_condition, self.conditions[self.n_condition]))
         else:
             self.condition.set("終了してください")
-            self.button_4["state"]=tkinter.NORMAL
-        outf = "rslts/%s.json" %self.results["subject-ID"].zfill(3)
-        with open(outf, "w") as fd:
-            json.dump(self.results, fd, indent=2)
+            self.button_1["state"] = tkinter.DISABLED
+            self.button_2["state"] = tkinter.DISABLED
+            self.button_3["state"] = tkinter.DISABLED
+            self.button_5["state"]=tkinter.NORMAL
+        outf = "%s/%s.json" %(args.tmpd, self.results["subject-ID"].zfill(3))
+        save_file(outf, self.results)
         self.graph.graph_init()
+        return 0
 
     def button_4(self):
-        makedirs("rslts", exist_ok=True)
-        outf = "rslts/%s.json" %self.results["subject-ID"].zfill(3)
-        with open(outf, "w") as fd:
-            json.dump(self.results, fd, indent=2)
+        self.newWindow = tkinter.Toplevel(self.root)
+        self.graph = Graph(self.newWindow, self.args)
+
+    def button_5(self):
+        outf = "%s/%s.json" %(args.outd, self.results["subject-ID"].zfill(3))
+        save_file(outf, self.results)
         exit()
+
+def save_file(outf, d, overwrite_check=True, indent=2):
+    cnt = 1
+    _outf = outf
+    while overwrite_check:
+        if isfile(outf):
+            outf = "%s.%d.json" %(splitext(_outf)[0], cnt)
+            cnt += 1
+        else:
+            overwrite_check = False
+    with open(outf, "w") as fd:
+        json.dump(d, fd, indent=indent)
 
 
 class Graph(tkinter.Frame):
-    def __init__(self, root):
+    def __init__(self, root, args):
         super().__init__(root)
         self.root = root
         self.pack()
         self.root.title("Graph")
-        self.root.geometry("500x600")
-        self.canvas = tkinter.Canvas(self.root, width=500, height=600)
+        self.root.geometry("%dx%d" %(args.graph_width, args.graph_height))
+        self.canvas = tkinter.Canvas(self.root, width=args.graph_width, height=args.graph_height)
+        self.args = args
 
     def graph_init(self):
         self.canvas.delete("all")
@@ -174,7 +219,8 @@ class Graph(tkinter.Frame):
         A: 他者比較（a1 見せる，a2 見せない）
         B: 過去比較（b1 見せる，b2 見せない）
         """
-        score_other = int(round(score_now * 0.9))
+        mag = random.uniform(*self.args.other_score_range)
+        score_other = int(round(score_now * mag))
         if condition=="practice":
             pass
         else:
@@ -186,30 +232,44 @@ class Graph(tkinter.Frame):
                 pass
             elif condition.find("b2")>=0:
                 score_old = -1
+            if score_other==-1 and score_old==-1:
+                score_now = 0
         
         # create_rectangle(x1, y1, x2, y2)
+        values = []
+        for v in (score_now, score_old, score_other):
+            if v>=0:
+                values.append(v)
+        vmax, vmin = max(values), min(values)
+        a = (400 - 100) / (vmin - vmax)
+        b = 400 - (vmin * a)
+
         if score_now>=0:
-            top_1 = 100
-            self.canvas.create_rectangle(0, top_1, 100, 500, fill="red")
+            top_1 = int(a * score_now + b)
+            self.canvas.create_rectangle(0, top_1, 100, 500, fill=self.args.graph_color_now)
             self.canvas.create_text(50, 550, text="あなたの\n今回の成績", font=("Helvetica", 12, "bold"))
-            self.canvas.create_text(50, top_1-10, text=str(500), font=("Helvetica", 12, "bold"))
+            self.canvas.create_text(50, top_1-10, text=str(score_now), font=("Helvetica", 12, "bold"))
         if score_old>=0:
-            top_2 = 110
-            self.canvas.create_rectangle(150, top_2, 250, 500, fill="green")
+            top_2 = int(a * score_old + b)
+            self.canvas.create_rectangle(150, top_2, 250, 500, fill=self.args.graph_color_old)
             self.canvas.create_text(200, 550, text="あなたの\n過去の成績", font=("Helvetica", 12, "bold"))
-            self.canvas.create_text(200, top_2-10, text=str(490), font=("Helvetica", 12, "bold"))        
+            self.canvas.create_text(200, top_2-10, text=str(score_old), font=("Helvetica", 12, "bold"))        
         if score_other>=0:
-            top_3 = 120
-            self.canvas.create_rectangle(300, top_3, 400, 500, fill="blue")
+            top_3 = int(a * score_other + b)
+            self.canvas.create_rectangle(300, top_3, 400, 500, fill=self.args.graph_color_other)
             self.canvas.create_text(350, 550, text="他の人の\n今回の成績", font=("Helvetica", 12, "bold"))
-            self.canvas.create_text(350, top_3-10, text=str(480), font=("Helvetica", 12, "bold"))        
+            self.canvas.create_text(350, top_3-10, text=str(score_other), font=("Helvetica", 12, "bold"))        
             self.canvas.pack()
 
 
-def main():
+def main(args):
     root = tkinter.Tk()
-    app = App(root)
+    app = App(root, args)
     app.mainloop()
 
 if __name__=="__main__":
-    main()
+    args = get_args()
+    random.seed(args.seed)
+    makedirs(args.outd, exist_ok=True)
+    makedirs(args.tmpd, exist_ok=True)
+    main(args)
