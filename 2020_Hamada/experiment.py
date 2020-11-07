@@ -115,7 +115,10 @@ class App(tkinter.Frame):
         self.button_5.place(x=200, y=200)
 
     def button_0(self):
-        ID = int(self.entry_ID.get())
+        try:
+            ID = int(self.entry_ID.get())
+        except ValueError:
+            ID = -1
         if 1<=ID<=24:
             pass
         elif ID==0:
