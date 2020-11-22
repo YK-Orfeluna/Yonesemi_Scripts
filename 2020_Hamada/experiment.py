@@ -7,6 +7,7 @@ import tkinter
 from tkinter import messagebox
 from os import makedirs
 from os.path import splitext, isfile
+import sys
 
 import argparse
 def get_args():
@@ -15,7 +16,7 @@ def get_args():
     parser.add_argument("--tmpd", default="tmp")
     parser.add_argument("--id2conditions", default="./id2conditions.json")
     parser.add_argument("--experimenter_height", type=int, default=250)
-    parser.add_argument("--experimenter_width", type=int, default=600)
+    parser.add_argument("--experimenter_width", type=int, default=700)
     parser.add_argument("--graph_height", type=int, default=600)
     parser.add_argument("--graph_width", type=int, default=500)
     parser.add_argument("--graph_color_now", default="red")
@@ -53,7 +54,7 @@ class App(tkinter.Frame):
         self.condition = tkinter.StringVar()
         self.condition.set("被験者IDを入力して，【set】を押す")
         label_condtion = tkinter.Label(textvariable=self.condition)
-        label_condtion.place(x=200, y=0)
+        label_condtion.place(x=300, y=0)
 
         self.newWindow = tkinter.Toplevel(self.root)
         self.graph = Graph(self.newWindow, args)
@@ -106,11 +107,11 @@ class App(tkinter.Frame):
         self.button_1 = tkinter.Button(text="グラフを表示する", width=12, command=self.button_1, state=tkinter.DISABLED)
         self.button_1.place(x=350, y=110)
         self.button_2 = tkinter.Button(text="グラフを初期化", width=12, command=self.button_2, state=tkinter.DISABLED)
-        self.button_2.place(x=450, y=110)
+        self.button_2.place(x=550, y=110)
         self.button_3 = tkinter.Button(text="次の条件へ", width=12, command=self.button_3, state=tkinter.DISABLED)
         self.button_3.place(x=350, y=140)
         self.button_4 = tkinter.Button(text="Graphを再配置", width=12, command=self.button_4)
-        self.button_4.place(x=450, y=140)
+        self.button_4.place(x=550, y=140)
         self.button_5 = tkinter.Button(text="保存して終了", width=14, command=self.button_5, state=tkinter.DISABLED)
         self.button_5.place(x=200, y=200)
 
@@ -155,7 +156,7 @@ class App(tkinter.Frame):
             self.entry_3_1.get(), self.entry_3_2.get(), self.entry_3_3.get(), \
         ]
         try:
-            self.results[self.conditions[self.n_condition]] = list(map(int, self.results[self.conditions[self.n_condition]]))
+            self.results[self.conditions[self.n_condition]] = list(map(float, self.results[self.conditions[self.n_condition]]))
         except ValueError:
             messagebox.showwarning("Warning", "全てのスコアが入力されていません．\n全てのスコアを入力してもう一度ボタンを押してください．")
             return 1
@@ -189,7 +190,7 @@ class App(tkinter.Frame):
     def button_5(self):
         outf = "%s/%s.json" %(args.outd, self.results["subject-ID"].zfill(3))
         save_file(outf, self.results)
-        exit()
+        sys.exit()
 
 def save_file(outf, d, overwrite_check=True, indent=2):
     cnt = 1
@@ -224,8 +225,18 @@ class Graph(tkinter.Frame):
         """
         mag = random.uniform(*self.args.other_score_range)
         score_other = int(round(score_now * mag))
+
+        values = [score_now, score_old, score_other]
+        vmax, vmin = max(values), min(values)
         if condition=="practice":
-            pass
+            a, b = 0, 100
+        else:
+            a = (400 - 100) / (vmin - vmax + 1e-5)
+            b = 400 - (vmin * a)
+
+        if condition=="practice":
+            score_other = -1
+            score_old = -1
         else:
             if condition.find("a1")>=0:
                 pass
@@ -236,17 +247,9 @@ class Graph(tkinter.Frame):
             elif condition.find("b2")>=0:
                 score_old = -1
             if score_other==-1 and score_old==-1:
-                score_now = 0
+                score_now = -1
         
         # create_rectangle(x1, y1, x2, y2)
-        values = []
-        for v in (score_now, score_old, score_other):
-            if v>=0:
-                values.append(v)
-        vmax, vmin = max(values), min(values)
-        a = (400 - 100) / (vmin - vmax)
-        b = 400 - (vmin * a)
-
         if score_now>=0:
             top_1 = int(a * score_now + b)
             self.canvas.create_rectangle(0, top_1, 100, 500, fill=self.args.graph_color_now)
@@ -256,13 +259,13 @@ class Graph(tkinter.Frame):
             top_2 = int(a * score_old + b)
             self.canvas.create_rectangle(150, top_2, 250, 500, fill=self.args.graph_color_old)
             self.canvas.create_text(200, 550, text="あなたの\n過去の成績", font=("Helvetica", 12, "bold"))
-            self.canvas.create_text(200, top_2-10, text=str(score_old), font=("Helvetica", 12, "bold"))        
+            self.canvas.create_text(200, top_2-10, text=str(score_old), font=("Helvetica", 12, "bold"))
         if score_other>=0:
             top_3 = int(a * score_other + b)
             self.canvas.create_rectangle(300, top_3, 400, 500, fill=self.args.graph_color_other)
             self.canvas.create_text(350, 550, text="他の人の\n今回の成績", font=("Helvetica", 12, "bold"))
-            self.canvas.create_text(350, top_3-10, text=str(score_other), font=("Helvetica", 12, "bold"))        
-            self.canvas.pack()
+            self.canvas.create_text(350, top_3-10, text=str(score_other), font=("Helvetica", 12, "bold"))
+        self.canvas.pack()
 
 
 def main(args):
